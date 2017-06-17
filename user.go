@@ -16,7 +16,6 @@ import (
 	"os"
 	osuser "os/user"
 	"strings"
-	//"github.com/davejfranco/usergo/util"
 )
 
 type User struct {
@@ -82,10 +81,12 @@ func (usr User) Add() error {
 			return err
 		}
 
+		//Add SSH key, should this be a separate method?
 		aerr := ioutil.WriteFile(sshdir+"/authorized_keys", []byte(usr.Publickey), 0600)
 		if aerr != nil {
 			fmt.Println(aerr)
 		}
+
 		//Change ownership to the user
 		err := Execute("chown", "-R", string(fmt.Sprintf("%s:%s", usr.Name, usr.Name)), sshdir)
 		//fmt.Println(string(fmt.Sprintf("%s:%s", usr.name)), sshdir)
@@ -117,15 +118,3 @@ func (usr User) Makesudo() {
 		panic(err)
 	}
 }
-
-/*
-func main() {
-
-	answer := checkGroup("nobody")
-	if !answer {
-		fmt.Println("Group doesn't exist")
-		os.Exit(1)
-	}
-	fmt.Println("Hell yeah is here")
-}
-*/
