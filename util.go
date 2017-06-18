@@ -1,18 +1,28 @@
 package user
 
-import "os/exec"
+import (
+	"os/exec"
+	"os/user"
+)
 
-/*
-func main() {
-	cmd := "convert"
-	args := []string{"-resize", "50%", "foo.jpg", "foo.half.jpg"}
-	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+//Check if user exist
+func checkUser(username string) bool {
+	_, err := user.Lookup(username)
+	if err != nil {
+		return false
 	}
-	fmt.Println("Successfully halved image in size")
+	return true
 }
-*/
+
+//Check if group exist
+func checkGroup(groupname string) bool {
+	_, err := user.LookupGroup(groupname)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func Execute(comand string, args ...string) error {
 
 	if err := exec.Command(comand, args...).Run(); err != nil {
