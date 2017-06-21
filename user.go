@@ -95,38 +95,25 @@ func (usr User) Del() {
 }
 
 //Create a sudo file for user
-func (usr User) Makesudo() {
+func (usr User) Makesudo(commands ...string) error {
 
-	//file := []byte("user ALL = NOPASSWD: ALL\nuser ALL=(ALL) NOPASSWD:ALL\n")
-	file := fmt.Sprintf("%s ALL = NOPASSWD: ALL\n%s ALL=(ALL) NOPASSWD:ALL\n", usr.Name, usr.Name)
+	sudofile := "Cmnd_Alias     COMMANDS = %s\n%s ALL=(ALL) NOPASSWD:COMMANDS"
 
-	err := ioutil.WriteFile(fmt.Sprintf("/etc/sudoers.d/%s", usr.Name), []byte(file), 0644)
-	if err != nil {
-		panic(err)
+	addsudoer := func(cmd string) error {
+		file := fmt.Sprintf(sudofile, cmd, usr.Name)
+		err := ioutil.WriteFile(fmt.Sprintf("/etc/sudoers.d/%s", usr.Name), []byte(file), 0644)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	//if sudo should allow ALL commands
+	if commands[0] == "ALL" || commands[0] == "all" {
+		err := addsudoer(strings.ToUpper(commands[0]))
+		return err
+	} else {
+		err := addsudoer(strings.Join(commands, ","))
+		return err
 	}
 }
-
-/*
-Me playing around
-func main() {
-	//Add user
-	public_key := []string{
-		`ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNSloNNYSsk6ULLCbsPh5US47iq0dtYzE8gpUJeJrFDerGCrpMkfJdOtF78VS80lkl0M5p7GS0Sm3E/4tldXmyvo1GM/zJnBw7VuJ1Z7FI2x4hBu6z3eLBw8BWV0edrMKe2EXhHkbkly2fTtD7XKDr53coZ8G8/vtchEYtTnZ18FrAhE9SaWth20eQ47liJjK/sW0U3RmsL+5M2yxPt5LyftxxrAKg+YDyfbhijfvmvwrUVoyPWI3p9ndLhig4BciK5IUaUnDtZIPQmXxYLTdW5fgi+A8AeS66d3uiwWj3Au6yii1xwsQE/6YnzyudEVuBGtjRneTP8Yck81m4sxozZSp6++W0BhEQrWifzilcPLNr62myG2pUtidHlZtd9qEGA4sK3qbzsXF9ku0F0kLtjvdXJeRo6breHhQuvBLGZWDbZuqeM/tryp/75VyAOkI3fX0qTH6VW3Y881Z1ah9AqwcAIeGj1dyvuPGg2v7wxn+7BM5RwDLfqwAXUmIqoCzPvwxV2/uhgHTH4ZDoqyshzaqcKJhf+Py/DESAT3MQl+qnNzc5Uz4YPXj61dwmOUvkffPkzzrNEprm+vFn6AnWUBGWRHuK3k61wqW6BIJuNYn5nyKYJGLOUVVEZMulgSnI4FajOb8AoKs30EAITNMbC5n3T+DMNyOAAZDjQ+gdIQ== groupon@C02NLP3YG3QC.group.on`,
-		`ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNSloNNYSsk6ULLCbsPh5US47iq0dtYzE8gpUJeJrFDerGCrpMkfJdOtF78VS80lkl0M5p7GS0Sm3E/4tldXmyvo1GM/zJnBw7VuJ1Z7FI2x4hBu6z3eLBw8BWV0edrMKe2EXhHkbkly2fTtD7XKDr53coZ8G8/vtchEYtTnZ18FrAhE9SaWth20eQ47liJjK/sW0U3RmsL+5M2yxPt5LyftxxrAKg+YDyfbhijfvmvwrUVoyPWI3p9ndLhig4BciK5IUaUnDtZIPQmXxYLTdW5fgi+A8AeS66d3uiwWj3Au6yii1xwsQE/6YnzyudEVuBGtjRneTP8Yck81m4sxozZSp6++W0BhEQrWifzilcPLNr62myG2pUtidHlZtd9qEGA4sK3qbzsXF9ku0F0kLtjvdXJeRo6breHhQuvBLGZWDbZuqeM/tryp/75VyAOkI3fX0qTH6VW3Y881Z1ah9AqwcAIeGj1dyvuPGg2v7wxn+7BM5RwDLfqwAXUmIqoCzPvwxV2/uhgHTH4ZDoqyshzaqcKJhf+Py/DESAT3MQl+qnNzc5Uz4YPXj61dwmOUvkffPkzzrNEprm+vFn6AnWUBGWRHuK3k61wqW6BIJuNYn5nyKYJGLOUVVEZMulgSnI4FajOb8AoKs30EAITNMbC5n3T+DMNyOAAZDjQ+gdIQ== groupon@C02NLP3YG3QC.group.com`,
-		`ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNSloNNYSsk6ULLCbsPh5US47iq0dtYzE8gpUJeJrFDerGCrpMkfJdOtF78VS80lkl0M5p7GS0Sm3E/4tldXmyvo1GM/zJnBw7VuJ1Z7FI2x4hBu6z3eLBw8BWV0edrMKe2EXhHkbkly2fTtD7XKDr53coZ8G8/vtchEYtTnZ18FrAhE9SaWth20eQ47liJjK/sW0U3RmsL+5M2yxPt5LyftxxrAKg+YDyfbhijfvmvwrUVoyPWI3p9ndLhig4BciK5IUaUnDtZIPQmXxYLTdW5fgi+A8AeS66d3uiwWj3Au6yii1xwsQE/6YnzyudEVuBGtjRneTP8Yck81m4sxozZSp6++W0BhEQrWifzilcPLNr62myG2pUtidHlZtd9qEGA4sK3qbzsXF9ku0F0kLtjvdXJeRo6breHhQuvBLGZWDbZuqeM/tryp/75VyAOkI3fX0qTH6VW3Y881Z1ah9AqwcAIeGj1dyvuPGg2v7wxn+7BM5RwDLfqwAXUmIqoCzPvwxV2/uhgHTH4ZDoqyshzaqcKJhf+Py/DESAT3MQl+qnNzc5Uz4YPXj61dwmOUvkffPkzzrNEprm+vFn6AnWUBGWRHuK3k61wqW6BIJuNYn5nyKYJGLOUVVEZMulgSnI4FajOb8AoKs30EAITNMbC5n3T+DMNyOAAZDjQ+gdIQ== groupon@C02NLP3YG3QC.group.cl`,
-	}
-	user := User{
-		Name:      "dfranco",
-		Sudoer:    true,
-		Groups:    []string{"adm", "operator"},
-		Publickey: public_key,
-	}
-
-	//Add user
-	err := user.Add()
-	if err != nil {
-		fmt.Printf("Error is %s", err)
-	}
-
-}
-*/
