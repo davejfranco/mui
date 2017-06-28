@@ -1,4 +1,3 @@
-# Golang - usergo library
+# Golang - Ec2 user provisioning CLI
 
-For now this is just me in the golang's learning path but aiming to make this part of a bigger project I have in mind.
-
+I will use this project to build a CLI to provision user based on IAM 
