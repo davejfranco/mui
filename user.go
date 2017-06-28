@@ -1,14 +1,4 @@
-/*
-This is a user management library on golang -- duuh
-Things I want to have on this library
-
-- User creation
-- Find User
-- Delete User
-- Make user sudoer
--
-*/
-package user
+package main
 
 import (
 	"fmt"
@@ -17,6 +7,7 @@ import (
 	"strings"
 )
 
+//type user to describe a user on linux systems
 type User struct {
 	Name      string   `json:"name"`
 	Sudoer    bool     `json:"sudoer"`
@@ -24,6 +15,7 @@ type User struct {
 	Publickey []string `json:"public_key"`
 }
 
+//Add user
 func (usr User) Add() error {
 
 	//_, err := user.Lookup(usr.name)
@@ -84,17 +76,31 @@ func (usr User) Add() error {
 	return nil
 }
 
-func (usr User) Del() {
+//Del user
+func (usr User) Del() error {
+
 	//Check if user exist
 	isavail := checkUser(usr.Name)
 	if !isavail {
 		fmt.Println("user doesn't exist")
 	} else {
-		Execute("userdel", "-r", usr.Name)
+		err := Execute("userdel", "-r", usr.Name)
+		if err != nil {
+			return err
+		}
 	}
+
+	//Remove sudoer file if exist
+	if _, err := os.Stat(fmt.Sprintf("/etc/sudoers.d/%s", usr.Name)); err == nil {
+		err := Execute("rm", fmt.Sprintf("/etc/sudoers.d/%s", usr.Name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-//Create a sudo file for user
+//Makesudo to grant sudo priveledges
 func (usr User) Makesudo(commands ...string) error {
 
 	sudofile := "Cmnd_Alias     COMMANDS = %s\n%s ALL=(ALL) NOPASSWD:COMMANDS"
@@ -112,8 +118,8 @@ func (usr User) Makesudo(commands ...string) error {
 	if commands[0] == "ALL" || commands[0] == "all" {
 		err := addsudoer(strings.ToUpper(commands[0]))
 		return err
-	} else {
-		err := addsudoer(strings.Join(commands, ","))
-		return err
 	}
+	err := addsudoer(strings.Join(commands, ","))
+	return err
+
 }
