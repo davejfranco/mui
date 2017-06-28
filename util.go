@@ -1,4 +1,4 @@
-package user
+package main
 
 import (
 	"os/exec"
@@ -23,8 +23,8 @@ func checkGroup(groupname string) bool {
 	return true
 }
 
+//Execute commands
 func Execute(comand string, args ...string) error {
-
 	if err := exec.Command(comand, args...).Run(); err != nil {
 		return err
 	}
