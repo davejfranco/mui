@@ -1,21 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 )
-
-// func main() {
-// 	//test
-// 	svc := AwsSession()
-// 	key, err := AwsGetSSHkey("dfranco", svc)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	fmt.Println(key)
-//
-// }
 
 func AwsSession() *iam.IAM {
 	// Create a session to share configuration, and load external configuration.
@@ -23,6 +15,32 @@ func AwsSession() *iam.IAM {
 
 	// Create the service's client with the session.
 	return iam.New(sess)
+}
+
+func IamCheckUser(user string, session *iam.IAM) bool {
+
+	input := &iam.GetUserInput{
+		UserName: aws.String(user),
+	}
+
+	_, err := session.GetUser(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case iam.ErrCodeNoSuchEntityException:
+				return false
+			case iam.ErrCodeServiceFailureException:
+				fmt.Println(iam.ErrCodeServiceFailureException, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
+		}
+	}
+	return true
 }
 
 func AwsGetSSHkey(user string, session *iam.IAM) (sshkeys []string, err error) {
@@ -36,6 +54,7 @@ func AwsGetSSHkey(user string, session *iam.IAM) (sshkeys []string, err error) {
 	//Get user sshs
 	sshKeyInfo, err := session.ListSSHPublicKeys(sshinput)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
@@ -58,4 +77,21 @@ func AwsGetSSHkey(user string, session *iam.IAM) (sshkeys []string, err error) {
 		return userKeys, nil
 	}
 	return []string{}, nil
+}
+
+func iamUser(user string) (usr User, err error) {
+	//create user based on IAM
+	//aws session
+	svc := AwsSession()
+
+	userkeys, err := AwsGetSSHkey(user, svc)
+	if err != nil {
+		return User{}, err
+	}
+
+	u := User{
+		Name:      user,
+		Publickey: userkeys,
+	}
+	return u, nil
 }
