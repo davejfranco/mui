@@ -17,4 +17,6 @@ ENV GOPATH /code
 RUN mkdir -p /code/src/github.com/davejfranco/usergo
 ADD . /code/src/github.com/davejfranco/usergo
 
+#Install aws dependency
+RUN go get github.com/aws/aws-sdk-go/aws
 WORKDIR /code/src/github.com/davejfranco/usergo
