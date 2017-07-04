@@ -4,10 +4,38 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"os/user"
 	"strings"
 )
 
-//type user to describe a user on linux systems
+//Execute commands
+func Execute(comand string, args ...string) error {
+	if err := exec.Command(comand, args...).Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+//Check if user exist
+func checkUser(username string) bool {
+	_, err := user.Lookup(username)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+//Check if group exist
+func checkGroup(groupname string) bool {
+	_, err := user.LookupGroup(groupname)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+//User type
 type User struct {
 	Name      string   `json:"name"`
 	Sudoer    bool     `json:"sudoer"`
@@ -49,29 +77,47 @@ func (usr User) Add() error {
 			}
 		}
 
-		//create ssh directory
-		sshdir := fmt.Sprintf("/home/%s/.ssh", usr.Name)
+		//Give sudo to the user
+		if usr.Sudoer == true {
+			usr.Makesudo("all")
+		}
+
+		//Add Publickey
+		if len(usr.Publickey) > 0 {
+			usr.AddPublicKey()
+		}
+
+	}
+	return nil
+}
+
+//AddPublicKey to the user
+func (usr User) AddPublicKey() error {
+
+	//create ssh directory
+	sshdir := fmt.Sprintf("/home/%s/.ssh", usr.Name)
+	if _, err := os.Stat(sshdir); os.IsNotExist(err) {
 		err := os.Mkdir(sshdir, 0644)
 		if err != nil {
 			return err
 		}
+	}
 
-		//Add public keys
-		f, err := os.OpenFile(sshdir+"/authorized_keys", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-		if err != nil {
+	//Add public keys
+	f, err := os.OpenFile(sshdir+"/authorized_keys", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range usr.Publickey {
+		if _, err = f.WriteString(v + "\n"); err != nil {
 			panic(err)
 		}
-		for _, v := range usr.Publickey {
-			if _, err = f.WriteString(v + "\n"); err != nil {
-				panic(err)
-			}
-		}
+	}
 
-		//Change ownership to the user
-		err = Execute("chown", "-R", string(fmt.Sprintf("%s:%s", usr.Name, usr.Name)), sshdir)
-		if err != nil {
-			return err
-		}
+	//Change ownership to the user
+	err = Execute("chown", "-R", string(fmt.Sprintf("%s:%s", usr.Name, usr.Name)), sshdir)
+	if err != nil {
+		return err
 	}
 	return nil
 }
