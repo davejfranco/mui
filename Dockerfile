@@ -14,9 +14,12 @@ ENV PATH "$PATH:/go/bin"
 ENV GOPATH /code
 
 #ADD code
-RUN mkdir -p /code/src/github.com/davejfranco/usergo
-ADD . /code/src/github.com/davejfranco/usergo
+RUN mkdir -p /code/src/github.com/davejfranco/mui
+#ADD . /code/src/github.com/davejfranco/mui
+VOLUME /code/src/github.com/davejfranco/mui
 
 #Install aws dependency
 RUN go get github.com/aws/aws-sdk-go/aws
-WORKDIR /code/src/github.com/davejfranco/usergo
+RUN mkdir /root/.aws
+
+WORKDIR /code/src/github.com/davejfranco/mui
