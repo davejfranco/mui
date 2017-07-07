@@ -79,19 +79,14 @@ func AwsGetSSHkey(user string, session *iam.IAM) (sshkeys []string, err error) {
 	return []string{}, nil
 }
 
-func iamUser(user string) (usr User, err error) {
+func IamUserKeys(user string) ([]string, error) {
 	//create user based on IAM
 	//aws session
 	svc := AwsSession()
 
 	userkeys, err := AwsGetSSHkey(user, svc)
 	if err != nil {
-		return User{}, err
+		return []string{}, err
 	}
-
-	u := User{
-		Name:      user,
-		Publickey: userkeys,
-	}
-	return u, nil
+	return userkeys, nil
 }
