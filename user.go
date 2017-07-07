@@ -46,48 +46,38 @@ type User struct {
 //Add user
 func (usr User) Add() error {
 
-	//_, err := user.Lookup(usr.name)
-	isavail := checkUser(usr.Name)
-	if !isavail {
-		//This means that the user doesn'exist
-		cmd := "useradd"
+	cmd := "useradd"
 
-		//When are more than one group to add
-		if len(usr.Groups) > 0 {
-			//If the length of the field group is greater than zero check groups and then
+	//When are more than one group to add
+	if len(usr.Groups) > 0 {
+		//If the length of the field group is greater than zero check groups and then
 
-			var validGroup []string
-			for _, v := range usr.Groups {
-				//Is an existing group on the system?
-				if checkGroup(v) {
-					validGroup = append(validGroup, v)
-				}
-			}
-			//Run useradd plus the groups that the user should be member
-			err := Execute(cmd, "-G", strings.Join(validGroup, ","), "-m", usr.Name)
-			if err != nil {
-				return err
-			}
-
-		} else {
-			//add user without groups
-			err := Execute(cmd, "-m", usr.Name)
-			if err != nil {
-				return err
+		var validGroup []string
+		for _, v := range usr.Groups {
+			//Is an existing group on the system?
+			if checkGroup(v) {
+				validGroup = append(validGroup, v)
 			}
 		}
-
-		//Give sudo to the user
-		if usr.Sudoer == true {
-			usr.Makesudo("all")
+		//Run useradd plus the groups that the user should be member
+		err := Execute(cmd, "-G", strings.Join(validGroup, ","), "-m", usr.Name)
+		if err != nil {
+			return err
 		}
 
-		//Add Publickey
-		if len(usr.Publickey) > 0 {
-			usr.AddPublicKey()
+	} else {
+		//add user without groups
+		err := Execute(cmd, "-m", usr.Name)
+		if err != nil {
+			return err
 		}
-
 	}
+
+	//Add Publickey
+	if len(usr.Publickey) > 0 {
+		usr.AddPublicKey()
+	}
+
 	return nil
 }
 
@@ -149,7 +139,7 @@ func (usr User) Del() error {
 //Makesudo to grant sudo priveledges
 func (usr User) Makesudo(commands ...string) error {
 
-	sudofile := "Cmnd_Alias     COMMANDS = %s\n%s ALL=(ALL) NOPASSWD:COMMANDS"
+	sudofile := "Cmnd_Alias     COMMANDS = %s\n%s ALL=(ALL) NOPASSWD:COMMANDS\n"
 
 	addsudoer := func(cmd string) error {
 		file := fmt.Sprintf(sudofile, cmd, usr.Name)
