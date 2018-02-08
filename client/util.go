@@ -53,7 +53,7 @@ func CheckGroup(groupname string) bool {
 }
 
 func DelSudoer(user string) error {
-
+	//scan the sudoer file with the line matching the user
 	file, err := ioutil.ReadFile(sudofile)
 	if err != nil {
 		return err
@@ -141,3 +141,22 @@ func DelUser(user User) {
 		fmt.Printf("Error: %s", err)
 	}
 }
+
+// func CurrentUsers() []User {
+
+// 	home := "/Users"
+// 	var users []User
+
+// 	out, err := exec.Command("ls", home).Output()
+// 	if err != nil {
+// 		panic(err)
+// 	}
+
+// 	output := strings.Split(string(out), "\n")
+// 	for _, user := range output[:len(output)-1] {
+// 		users = append(users, User{Name: user})
+// 	}
+
+// 	return users
+
+//}
