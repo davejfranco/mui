@@ -3,35 +3,13 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 )
-
-func main() {
-
-	url := MysqlConfig{
-		User:     "muiadmin",
-		Password: "muipass",
-		Host:     "localhost",
-		DB:       "mui",
-	}
-
-
-	conn := DBConn(url.Uri())
-	defer conn.Close()
-
-	me := User{
-		Username: "dfranco",
-		FullName: "Dave Franco",
-	}
-
-	//Create me
-	fmt.Println(me.NewUser(conn))
-
-}
 
 type MysqlConfig struct {
 	User     string
@@ -75,54 +53,132 @@ func (config MysqlConfig) Uri() string {
 }
 
 //Create Connection to database
-func DBConn(uri string) *sql.DB {
-
-	db, err := sql.Open("mysql", uri)
+func (db MysqlConfig) Conn() *sql.DB {
+	conn, err := sql.Open("mysql", db.Uri())
 	if err != nil {
 		panic(err)
 	}
-
-	return db
+	return conn
 }
 
+//User type
 type User struct {
-	Username string `db:"username"`
-	FullName string `db:"full_name"`
+	Username  string `db:"username" json:"username"`
+	FullName  string `db:"full_name" json:"full_name"`
+	Created   string `db:"created" json:"created"`
+	PublicKey string `db:"public_key" json:"publickey"`
+}
+
+type Group struct {
+	GroupId string `db:"groupid"`
+	Users   []User
+}
+
+//Server type
+type Server struct {
+	Ec2Id    string `db:"ec2_id" json:"ec2_id"`
+	ServerIP string `db:"server_ip" json:"server_ip"`
+}
+
+type Model struct {
+	MysqlConfig
+}
+
+//IfExist user
+func (user *User) ifExist(conn *sql.DB) bool {
+
+	query := "SELECT username FROM mui.users WHERE username=?"
+	var username string
+
+	err := conn.QueryRow(query, user.Username).Scan(&username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false
+		}
+		log.Fatal(err)
+	}
+	return true
 }
 
 //Add new user
-func (usr User) NewUser(conn *sql.DB) error {
+func (user *User) newUser(conn *sql.DB) error {
 
-	insertquery := "INSERT INTO mui.users (username, full_name) VALUES (?, ?)"
-	_, err := conn.Exec(insertquery, usr.Username, usr.FullName)
+	if user.ifExist(conn) {
+		return nil
+	}
+
+	insertquery := "INSERT INTO mui.users (username, full_name, created) VALUES (?, ?, ?)"
+	//not sure if to set the current time in here
+	user.Created = CurrentTime()
+	_, err := conn.Exec(insertquery, user.Username, user.FullName, user.Created)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func 
-
-type Group struct {
-	Name string `db:"name"`
+//modUser
+func (user *User) modUser(conn *sql.DB) error {
+	//"UPDATE mui.users SET full_name="Carlos D. Rodriguez" WHERE username='crodriguez'"
+	modquery := "UPDATE mui.users SET username=?, full_name=? WHERE username=?"
+	_, err := conn.Exec(modquery, user.Username, user.FullName, user.Username)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-type Server struct {
-	Ec2Id    string `db:"ec2_id"`
-	ServerIp string `db:"server_ip"`
-	UserId   int    `db:user_id`
+//delUser hate this comments
+func (user *User) delUser(conn *sql.DB) error {
+	delquery := "DELETE FROM mui.users WHERE username=?"
+	_, err := conn.Exec(delquery, user.Username)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (srv Server) Add(conn *sql.DB) error {
+func getAllUsers(conn *sql.DB) []User {
 
-	query := "INSERT INTO `server` (ec2_id, server_ip) VALUES (?, ?);"
+	query := "SELECT * FROM mui.users"
+	rows, err := conn.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var allusers []User
+	for rows.Next() {
+		var (
+			username string
+			fullname string
+			created  string
+		)
+
+		err = rows.Scan(&username, &fullname, &created)
+		if err != nil {
+			log.Fatal(err)
+		}
+		user := User{
+			Username: username,
+			FullName: fullname,
+			Created:  created,
+		}
+		allusers = append(allusers, user)
+	}
+	return allusers
+
+}
+
+//Add node
+func (srv Server) newNode(conn *sql.DB) error {
+
+	query := "INSERT INTO `mui.server` (ec2_id, server_ip, created) VALUES (?, ?, ?);"
 	conn.Prepare(query)
-	result, err := conn.Exec(srv.Ec2Id, srv.ServerIp)
+	result, err := conn.Exec(srv.Ec2Id, srv.ServerIP)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println(result)
 	return nil
-
 }
