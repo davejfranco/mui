@@ -90,8 +90,8 @@ func UserExist(db *sql.DB, user string) bool {
 }
 
 //GetUser returns a type User or error from the database based on a given username
-func GetUser(db *sql.DB, user string) (User, error) {
-	query := "SELECT full_name, sudo,  public_key, created FROM users WHERE username=?"
+func GetUser(db *sql.DB, user string) User {
+	query := "SELECT * FROM users WHERE username=?"
 
 	var (
 		usr  string
@@ -108,7 +108,10 @@ func GetUser(db *sql.DB, user string) (User, error) {
 		&crea)
 
 	if err != nil {
-		return User{}, err
+		if err == sql.ErrNoRows {
+			return User{}
+		}
+		log.Fatal(err)
 	}
 
 	usu := User{
@@ -125,7 +128,7 @@ func GetUser(db *sql.DB, user string) (User, error) {
 		usu.Publickey = pk.String
 	}
 
-	return usu, nil
+	return usu
 }
 
 //DelUser deletes user from users table
@@ -151,17 +154,19 @@ func GetallUsers(db *sql.DB) []User {
 		var (
 			user string
 			full sql.NullString //This field can be Null
+			su   string
 			crea string
 			pk   sql.NullString //This field can also be Null
 		)
 
-		err = rows.Scan(&user, &full, &crea, &pk)
+		err = rows.Scan(&user, &full, &su, &crea, &pk)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		usr := User{
 			Username: user,
+			Sudo:     su,
 			Created:  crea,
 		}
 
@@ -326,7 +331,7 @@ func (m *Model) NewServer() error {
 
 	query := "INSERT INTO `server` (ec2_id, server_ip, created) VALUES (?, ?, ?);"
 	m.conn.Prepare(query)
-	result, err := m.conn.Exec(m.Ec2Id, m.ServerIP)
+	_, err := m.conn.Exec(m.Ec2Id, m.ServerIP)
 	if err != nil {
 		return err
 	}
