@@ -12,50 +12,52 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+//MysqlConfig struct takes all the parameters required to create connection to the mysql database
 type MysqlConfig struct {
-	User     string
-	Password string
-	Host     string
-	Port     int
-	DB       string
+	user     string
+	password string
+	host     string
+	port     int
+	db       string
 }
 
-//return uri connection format id:password@tcp(your-amazonaws-uri.com:3306)/dbname
-func (config MysqlConfig) Uri() string {
+//URI method returns a string formatted uri like id:password@tcp(your-amazonaws-uri.com:3306)/dbname
+//This method will latter be use to connect to a mysql server
+func (config MysqlConfig) URI() string {
 	//Mandatory database name
-	if config.DB == "" {
+	if config.db == "" {
 		fmt.Println("Database name must be specified")
 		os.Exit(1)
 	}
 
 	var user, pass, address string
 
-	if config.User != "" {
-		user = config.User
+	if config.user != "" {
+		user = config.user
 	}
 
-	user = config.User
+	user = config.user
 
-	if config.Password != "" {
-		pass = fmt.Sprintf(":%s@", config.Password)
+	if config.password != "" {
+		pass = fmt.Sprintf(":%s@", config.password)
 	}
 
-	if config.Host != "" {
-		if config.Port != 0 {
-			address = fmt.Sprintf("tcp(%s:%s)", config.Host, strconv.Itoa(config.Port))
+	if config.host != "" {
+		if config.port != 0 {
+			address = fmt.Sprintf("tcp(%s:%s)", config.host, strconv.Itoa(config.port))
 		} else {
-			address = fmt.Sprintf("tcp(%s)", config.Host)
+			address = fmt.Sprintf("tcp(%s)", config.host)
 		}
 	} else {
 		address = ""
 	}
 
-	return strings.Join([]string{user, pass, address, "/", config.DB}, "")
+	return strings.Join([]string{user, pass, address, "/", config.db}, "")
 }
 
-//Create Connection to database
-func (db MysqlConfig) Conn() *sql.DB {
-	conn, err := sql.Open("mysql", db.Uri())
+//Conn method returns an sql.DB object of the mysql connection
+func (m MysqlConfig) Conn() *sql.DB {
+	conn, err := sql.Open("mysql", m.URI())
 	if err != nil {
 		panic(err)
 	}
@@ -66,23 +68,18 @@ func (db MysqlConfig) Conn() *sql.DB {
 type User struct {
 	Username  string `db:"username" json:"username"`
 	Sudo      string `db:"sudo" json:"sudo"`
-	FullName  string `db:"full_name" json:"full_name"`
-	PublicKey string `db:"public_key" json:"public_key"`
+	Fullname  string `db:"full_name" json:"full_name"`
+	Publickey string `db:"public_key" json:"public_key"`
 	Created   string `db:"created" json:"created"`
 }
 
-type UserModel struct {
-	*User
-	Conn *sql.DB
-}
-
-//Check if user exist
-func (u UserModel) Exist() bool {
+//UserExist checks on database is the username exist in the users table
+func UserExist(db *sql.DB, user string) bool {
 
 	query := "SELECT username FROM users WHERE username=?"
 	var username string
 
-	err := u.Conn.QueryRow(query, u.Username).Scan(&username)
+	err := db.QueryRow(query, user).Scan(&username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false
@@ -92,73 +89,191 @@ func (u UserModel) Exist() bool {
 	return true
 }
 
-//Get specific user
-func (u UserModel) Get() (User, error) {
+//GetUser returns a type User or error from the database based on a given username
+func GetUser(db *sql.DB, user string) (User, error) {
 	query := "SELECT full_name, sudo,  public_key, created FROM users WHERE username=?"
 
 	var (
-		fullname  sql.NullString //This field can be Null
-		sudo      string
-		publickey sql.NullString //This field can also be Null
-		created   string
+		usr  string
+		full sql.NullString //This field can be Null
+		su   string
+		pk   sql.NullString //This field can also be Null
+		crea string
 	)
 
-	err := u.Conn.QueryRow(query, u.Username).Scan(&fullname,
-		&sudo,
-		&publickey,
-		&created)
+	err := db.QueryRow(query, user).Scan(&usr,
+		&full,
+		&su,
+		&pk,
+		&crea)
 
 	if err != nil {
 		return User{}, err
 	}
-	user := User{
-		Username: u.Username,
-		Sudo:     sudo,
-		Created:  created,
+
+	usu := User{
+		Username: user,
+		Sudo:     su,
+		Created:  crea,
 	}
 
-	if fullname.Valid {
-		user.FullName = fullname.String
+	if full.Valid {
+		usu.Fullname = full.String
 	}
 
-	if publickey.Valid {
-		user.PublicKey = publickey.String
+	if pk.Valid {
+		usu.Publickey = pk.String
 	}
 
-	return user, nil
+	return usu, nil
 }
 
-//Add new user
-func (u *UserModel) New() error {
-
-	if u.Exist() {
-		return nil
-	}
-
-	switch {
-	case len(u.Username) == 0:
-		return errors.New("Username field is required")
-	case len(u.Sudo) == 0:
-		return errors.New("Sudo field is required")
-	}
-
-	insertquery := "INSERT INTO users (username, full_name, sudo, public_key, created) VALUES (?, ?, ?, ?, ?)"
-	_, err := u.Conn.Exec(insertquery, u.Username, NewNullString(u.FullName), u.Sudo, NewNullString(u.PublicKey), CurrentTime())
+//DelUser deletes user from users table
+func DelUser(db *sql.DB, user string) error {
+	delquery := "DELETE FROM users WHERE username=?"
+	_, err := db.Exec(delquery, user)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-//Update user
-func (u *UserModel) Update(field, value string) error {
+//GetallUsers returns all users in users table
+func GetallUsers(db *sql.DB) []User {
+
+	rows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var allusers []User
+	for rows.Next() {
+		var (
+			user string
+			full sql.NullString //This field can be Null
+			crea string
+			pk   sql.NullString //This field can also be Null
+		)
+
+		err = rows.Scan(&user, &full, &crea, &pk)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		usr := User{
+			Username: user,
+			Created:  crea,
+		}
+
+		if full.Valid {
+			usr.Fullname = full.String
+		}
+
+		if pk.Valid {
+			usr.Publickey = pk.String
+		}
+
+		allusers = append(allusers, usr)
+	}
+	return allusers
+}
+
+//Group type
+type Group struct {
+	GroupID string `db:"group_id"`
+	Created string `db:"created"`
+}
+
+//GroupExist return a boolean if the group exist in the group table
+func GroupExist(db *sql.DB, groupname string) bool {
+
+	var group string
+	err := db.QueryRow("SELECT group_id FROM group WHERE group_id=?", groupname).Scan(&group)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false
+		}
+		log.Fatal(err)
+	}
+	return true
+}
+
+//GetGroup return a type Group if found on group table
+func GetGroup(db *sql.DB, groupname string) (Group, error) {
+	query := "SELECT group_id, created FROM users WHERE group_id=?"
+
+	var (
+		groupid string
+		created string
+	)
+	err := db.QueryRow(query, groupname).Scan(&groupid, &created)
+	if err != nil {
+		return Group{}, err
+	}
+
+	return Group{
+		GroupID: groupid,
+		Created: created,
+	}, nil
+}
+
+//DelGroup function deletes a group from a group table
+func DelGroup(db *sql.DB, groupname string) error {
+	delquery := "DELETE FROM group WHERE group_name=?"
+	_, err := db.Exec(delquery, groupname)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//Server type
+type Server struct {
+	Ec2Id    string `db:"ec2_id" json:"ec2_id"`
+	ServerIP string `db:"server_ip" json:"server_ip"`
+}
+
+//Model type
+type Model struct {
+	conn *sql.DB
+	User
+	Group
+	Server
+}
+
+//NewUser adds new user on "user" table
+func (m *Model) NewUser() error {
+
+	//If user exist do not continue
+	if UserExist(m.conn, m.Username) {
+		return nil
+	}
+
+	switch {
+	case len(m.Username) == 0:
+		return errors.New("username field is required")
+	case len(m.Sudo) == 0:
+		return errors.New("Sudo field is required")
+	}
+
+	insertquery := "INSERT INTO users (username, full_name, sudo, public_key, created) VALUES (?, ?, ?, ?, ?)"
+	_, err := m.conn.Exec(insertquery, m.Username, NewNullString(m.Fullname), m.Sudo, NewNullString(m.Publickey), CurrentTime())
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+//UpdateUser method updates a given column of a user in users table
+func (m *Model) UpdateUser(field, value string) error {
 	//"UPDATE mui.users SET full_name="Carlos D. Rodriguez" WHERE username='crodriguez'"
 	if field != "username" && field != "full_name" && field != "sudo" && field != "public_key" {
 		return errors.New("Invalid field")
 	}
 
 	queryrun := func(q, v string) error {
-		_, err := u.Conn.Exec(q, v, u.Username)
+		_, err := m.conn.Exec(q, v, m.Username)
 		if err != nil {
 			return err
 		}
@@ -168,100 +283,52 @@ func (u *UserModel) Update(field, value string) error {
 	switch {
 	case field == "username":
 		query := fmt.Sprintf("Update users SET username=? WHERE username=?")
-		u.Username = value
+		m.Username = value
 		return queryrun(query, value)
 	case field == "full_name":
 		query := fmt.Sprintf("Update users SET full_name=? WHERE username=?")
-		u.FullName = value
+		m.Fullname = value
 		return queryrun(query, value)
 	case field == "sudo":
 		query := fmt.Sprintf("Update users SET sudo=? WHERE username=?")
-		u.Sudo = value
+		m.Sudo = value
 		return queryrun(query, value)
 	case field == "public_key":
 		query := fmt.Sprintf("Update users SET public_key=? WHERE username=?")
-		u.PublicKey = value
+		m.Publickey = value
 		return queryrun(query, value)
 	}
 	return nil
+
 }
 
-//Delete user
-func (u *UserModel) Del() error {
-	delquery := "DELETE FROM users WHERE username=?"
-	_, err := u.Conn.Exec(delquery, u.Username)
+//NewGroup method add new group to group table
+func (m *Model) NewGroup() error {
+	if len(m.GroupID) == 0 {
+		return errors.New("Groupname is required")
+	}
+
+	//If group already exist, do nothing
+	if GroupExist(m.conn, m.GroupID) {
+		return nil
+	}
+
+	query := "INSERT INTO group (group_id, created) VALUES (?, ?)"
+	_, err := m.conn.Exec(query, m.GroupID, CurrentTime())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-//Get all users
-func (u UserModel) Getall() []User {
+//NewServer method create a new entry in server table
+func (m *Model) NewServer() error {
 
-	rows, err := u.Conn.Query("SELECT * FROM users")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var allusers []User
-	for rows.Next() {
-		var (
-			username  string
-			fullname  sql.NullString //This field can be Null
-			created   string
-			publickey sql.NullString //This field can also be Null
-		)
-
-		err = rows.Scan(&username, &fullname, &created, &publickey)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		user := User{
-			Username: username,
-			Created:  created,
-		}
-
-		if fullname.Valid {
-			user.FullName = fullname.String
-		}
-
-		if publickey.Valid {
-			user.PublicKey = publickey.String
-		}
-
-		allusers = append(allusers, user)
-	}
-	return allusers
-}
-
-type Group struct {
-	GroupId string `db:"groupid"`
-	Users   []User
-}
-
-type GroupModel struct {
-	Group
-	Conn *sql.DB
-}
-
-//Server type
-type Server struct {
-	Ec2Id    string `db:"ec2_id" json:"ec2_id"`
-	ServerIP string `db:"server_ip" json:"server_ip"`
-}
-
-//Add node
-func (srv Server) newNode(conn *sql.DB) error {
-
-	query := "INSERT INTO `mui.server` (ec2_id, server_ip, created) VALUES (?, ?, ?);"
-	conn.Prepare(query)
-	result, err := conn.Exec(srv.Ec2Id, srv.ServerIP)
+	query := "INSERT INTO `server` (ec2_id, server_ip, created) VALUES (?, ?, ?);"
+	m.conn.Prepare(query)
+	result, err := m.conn.Exec(m.Ec2Id, m.ServerIP)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(result)
 	return nil
 }
