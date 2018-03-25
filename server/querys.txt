@@ -1,0 +1,26 @@
+//SELECT 
+SELECT column1, column2 FROM users;
+
+//INSERT
+INSERT INTO table (column1, column2) VALUES (value1, value2);
+
+//JOIN
+SELECT server.ec2_id, server_users.username FROM server
+INNER JOIN server_users ON server.ec2_id=server_users.ec2_id;
+
+//DELETE
+DELETE FROM table WHERE condition;
+
+//Create mysql user
+CREATE USER 'nombre_usuario'@'localhost' IDENTIFIED BY 'tu_contrasena';
+
+//Grant all privileges mysql
+GRANT ALL PRIVILEGES ON * . * TO 'nombre_usuario'@'localhost';
+
+//after granting or revoke privileges always do
+FLUSH PRIVILEGES;
+
+//DELETE MYSQL USER
+DROP USER ‘usuario_prueba’@‘localhost’;
+
+
