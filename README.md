@@ -1,3 +1,10 @@
-# Golang - Ec2 user provisioning CLI
+# Golang - Ec2 user provision
 
-I will use this project to build a CLI to provision user based on IAM 
+## Why?
+
+I'm using this project to learn few things:
+
+- Golang
+- API rest desing
+- Fulfilling my nerd desires xD
+
