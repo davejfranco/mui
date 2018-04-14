@@ -10,14 +10,14 @@ import (
 )
 
 type GroupStore struct {
-	conn *sql.DB
+	Conn *sql.DB
 }
 
-//Exist return a boolean if the group exist in the group table
-func (gs *GroupStore) Exist(groupname string) bool {
+//exist return a boolean if the group exist in the group table
+func (gs *GroupStore) exist(groupname string) bool {
 
 	var group string
-	err := gs.conn.QueryRow("SELECT group_id FROM group WHERE group_id=?", groupname).Scan(&group)
+	err := gs.Conn.QueryRow("SELECT group_id FROM group WHERE group_id=?", groupname).Scan(&group)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false
@@ -35,7 +35,7 @@ func (gs *GroupStore) Get(groupname string) (model.Group, error) {
 		groupid string
 		created string
 	)
-	err := gs.conn.QueryRow(query, groupname).Scan(&groupid, &created)
+	err := gs.Conn.QueryRow(query, groupname).Scan(&groupid, &created)
 	if err != nil {
 		return model.Group{}, err
 	}
@@ -54,12 +54,12 @@ func (gs *GroupStore) New(g model.Group) error {
 	}
 
 	//If group already exist, do nothing
-	if gs.Exist(g.GroupID) {
+	if gs.exist(g.GroupID) {
 		return nil
 	}
 
 	query := "INSERT INTO group (group_id, created) VALUES (?, ?)"
-	_, err := gs.conn.Exec(query, g.GroupID, util.CurrentTime())
+	_, err := gs.Conn.Exec(query, g.GroupID, util.CurrentTime())
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (gs *GroupStore) New(g model.Group) error {
 //Delete removes a group from a group table
 func (gs *GroupStore) Delete(groupname string) error {
 	delquery := "DELETE FROM group WHERE group_name=?"
-	_, err := gs.conn.Exec(delquery, groupname)
+	_, err := gs.Conn.Exec(delquery, groupname)
 	if err != nil {
 		return err
 	}

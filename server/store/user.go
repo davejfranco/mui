@@ -14,8 +14,8 @@ type UserStore struct {
 	Conn *sql.DB
 }
 
-//Exist checks on database is the username exist in the users table
-func (us *UserStore) Exist(user string) bool {
+//exist checks on database is the username exist in the users table
+func (us *UserStore) exist(user string) bool {
 
 	query := "SELECT username FROM users WHERE username=?"
 	var username string
@@ -121,7 +121,7 @@ func (us *UserStore) List() []model.User {
 func (us *UserStore) New(user model.User) error {
 
 	//If user exist do not continue
-	if us.Exist(user.Username) {
+	if us.exist(user.Username) {
 		return nil
 	}
 
